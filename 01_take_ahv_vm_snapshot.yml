@@ -1,0 +1,44 @@
+---
+- name: Nutnaix AHV Take VM Snapshot
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars_files:
+  - ./login.yml
+
+  vars:
+    ahv_vm_uuid: "9f61ec13-86ce-4158-81ab-d64f2b72872b"
+    ahv_vm_snapshot_name: "ansible-snapshot-test-001"
+
+  tasks:
+  - name: Take VM Snapshot {{ ahv_vm_snapshot_name }}
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/snapshots/"
+      method: POST
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      body:
+        snapshot_specs:
+        - vm_uuid: "{{ ahv_vm_uuid }}"
+          snapshot_name: "{{ ahv_vm_snapshot_name }}"
+      body_format: json
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 201
+    register: nutanix_vm_snapshot
+
+  - name: Get Task Info
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/tasks/{{ nutanix_vm_snapshot.json.task_uuid }}"
+      method: GET
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 200
+    register: nutanix_task
+
+  - name: Snapshot UUID
+    debug:
+      var: nutanix_task.json.entity_list
+

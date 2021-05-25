@@ -1,0 +1,32 @@
+---
+- name: Setup Web server
+  hosts: test-web-01
+  remote_user: root
+  gather_facts: yes
+
+  tasks:
+  - name: Install httpd
+    yum:
+      name: httpd
+      state: present
+
+  - name: Start service httpd
+    ansible.builtin.service:
+      name: httpd
+      state: started
+      enabled: yes
+
+  - name: Add test page
+    ansible.builtin.copy:
+      content: |
+        <h1><font color="red">Ansible</font> Web Server.</h1>
+        VM: <b>{{ inventory_hostname }} {{ ansible_default_ipv4.macaddress }}</b>
+      dest: /var/www/html/index.html
+
+  - name: Open http port
+    ansible.posix.firewalld:
+      port: 80/tcp
+      immediate: yes
+      permanent: yes
+      state: enabled
+

@@ -1,0 +1,103 @@
+---
+- name: Clone VM on Nutanix AHV
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars_files:
+  - ./login.yml
+
+  vars:
+    ahv_vm_uuid: "d3341d66-3ac8-4206-b5e9-daad1bf5ad0e"
+    ahv_new_vm_name: "test-web-01"
+
+  tasks:
+  - name: Clone VM {{ ahv_new_vm_name }}
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/vms/{{ ahv_vm_uuid }}/clone"
+      method: POST
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      body:
+        spec_list:
+        - name: "{{ ahv_new_vm_name }}"
+      body_format: json
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 201
+    register: nutanix_task
+
+  - name: Get Task Info
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/tasks/{{ nutanix_task.json.task_uuid }}"
+      method: GET
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 200
+    register: nutanix_task
+    until: nutanix_task.json.progress_status == "Succeeded"
+    retries: 36
+    delay: 5
+
+  - name: Get Sub Task Info
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/tasks/{{ nutanix_task.json.subtask_uuid_list[0] }}"
+      method: GET
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 200
+    register: nutanix_task
+
+  - name: Get New VM Info {{ ahv_new_vm_name }}
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/vms/{{ nutanix_task.json.entity_list[2].entity_id }}/?include_vm_nic_config=true"
+      method: GET
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 200
+    register: nutanix_vm
+
+  - name: PowerOn VM {{ ahv_new_vm_name }}
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/vms/{{ nutanix_task.json.entity_list[2].entity_id }}/set_power_state/"
+      method: POST
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      body:
+        transition: "ON"
+      body_format: json
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 201
+
+  - name: Get New VM Info after PowerOn {{ ahv_new_vm_name }}
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/vms/{{ nutanix_task.json.entity_list[2].entity_id }}/?include_vm_nic_config=true"
+      method: GET
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      body_format: json
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 200
+    register: nutanix_vm
+    until: nutanix_vm.json.power_state == "on"
+    retries: 36
+    delay: 5
+
+  - name: Output New VM IP Address
+    debug:
+      var: nutanix_vm.json.vm_nics[0].ip_address
+
+  - name: Wait for SSH
+    wait_for:
+      port: 22
+      host: "{{ nutanix_vm.json.vm_nics[0].ip_address }}"
+      search_regex: OpenSSH
+      delay: 5
+

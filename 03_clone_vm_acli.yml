@@ -1,0 +1,24 @@
+---
+- name: Clone VM on Nutanix AHV
+  hosts: lab-nxce-01.go-lab.jp
+  remote_user: nutanix
+  gather_facts: no
+
+  vars:
+    ahv_vm_uuid: "9f61ec13-86ce-4158-81ab-d64f2b72872b"
+    ahv_new_vm_name: "test-vm-clone-01"
+
+  tasks:
+  - name: Clone VM by acli {{ ahv_new_vm_name }}
+    shell:
+      cmd: "/usr/local/nutanix/bin/acli vm.clone {{ ahv_new_vm_name }} clone_from_vm={{ ahv_vm_uuid }}"
+
+  - name: Get VM UUID by acli {{ ahv_new_vm_name }}
+    shell:
+      cmd: "/usr/local/nutanix/bin/acli -o json-pretty vm.get {{ ahv_new_vm_name }}"
+    register: result
+
+  - name: Output acli result
+    debug:
+      var: result.stdout_lines
+

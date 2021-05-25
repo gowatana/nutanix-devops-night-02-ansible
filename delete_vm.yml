@@ -1,0 +1,42 @@
+---
+- name: Delete VM on Nutanix AHV
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars_files:
+  - ./login.yml
+
+  vars:
+    ahv_vm_name: "test-web-01"
+
+  tasks:
+  - name: Get VM Info {{ ahv_vm_name }}
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/vms/?filter=vm_name%3D%3D{{ ahv_vm_name }}"
+      method: GET
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 200
+    register: vm_entities
+
+  - name: Output VM UUID
+    debug:
+      msg: "uuid: {{ item.uuid }}"
+    with_items:
+    - "{{ vm_entities.json.entities }}"
+
+  - name: Delete VM {{ ahv_vm_name }}
+    uri:
+      url: "https://{{ prism_address }}:9440/api/nutanix/v2.0/vms/{{ item.uuid }}"
+      method: DELETE
+      user: "{{ prism_username }}"
+      password: "{{ prism_password }}"
+      body_format: json
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 201
+    with_items:
+    - "{{ vm_entities.json.entities }}"
+
