@@ -24,7 +24,7 @@
       dest: /var/www/html/index.html
 
   - name: Open http port
-    ansible.posix.firewalld:
+    firewalld:
       port: 80/tcp
       immediate: yes
       permanent: yes
